@@ -1,0 +1,415 @@
+{% comment %}
+  video-block.liquid
+  - Scoped CSS per-block instance (so multiple blocks don’t clash)
+  - Includes overlay style, gradient, opacity, text colors + mobile overrides
+  - Keeps your working Plyr init JS (block-safe)
+  - NEW: cover_full_height (when unchecked, behavior is unchanged)
+
+  FIXES:
+  - Autoplay now works reliably:
+    * Forces mute when autoplay is enabled (browser policy)
+    * Adds autoplay/muted/playsinline/loop attrs to HTML5 <video>
+    * Adds autoplay/mute/loop params to YouTube/Vimeo iframe src
+    * Calls player.play() on init when autoplay is enabled
+{% endcomment %}
+
+{%- liquid
+  assign id = block.id
+
+  assign iframe_video = block.settings.iframe_video
+  assign html5_video = block.settings.html5_video
+  assign image = block.settings.image
+
+  assign autoplay = block.settings.autoplay
+  assign autoloop = block.settings.autoloop
+
+  # IMPORTANT: force mute when autoplay is enabled (autoplay with sound is blocked by browsers)
+  assign mute = block.settings.mute_video
+  if autoplay
+    assign mute = true
+  endif
+
+  assign aspect_ratio = block.settings.aspect_ratio
+
+  assign controls_enabled = block.settings.controls
+  assign overlay_style = block.settings.overlay_style
+  assign video_overlay_color = block.settings.video_overlay_color
+  assign background_opacity = block.settings.background_opacity
+  assign gradient = block.settings.gradient
+  assign gradient_rotation = block.settings.gradient_rotation
+
+  assign pretext = block.settings.pretext
+  assign title = block.settings.title
+  assign subtitle = block.settings.subtitle
+  assign button_label = block.settings.button_label
+  assign button_style = block.settings.button_style
+
+  assign text_align = block.settings.text_align
+  assign horizontal_text_position = block.settings.horizontal_text_position
+  assign vertical_text_position = block.settings.vertical_text_position
+  assign text_width = block.settings.text_width
+
+  assign pretext_color = block.settings.pretext_color
+  assign heading_color = block.settings.heading_color
+  assign subheading_color = block.settings.subheading_color
+
+  assign pretext_color_mobile = block.settings.pretext_color_mobile
+  assign heading_color_mobile = block.settings.heading_color_mobile
+  assign subheading_color_mobile = block.settings.subheading_color_mobile
+  assign mobile_text_alignment = block.settings.mobile_text_alignment
+
+  assign mobile_text_below_video = block.settings.mobile_text_below_video
+
+  assign cover_full_height = block.settings.cover_full_height
+
+  assign video_exists = false
+  if iframe_video != blank or html5_video != blank
+    assign video_exists = true
+  endif
+
+  assign scope_class = 'video-block--' | append: id
+
+  # alpha checks (match original section pattern)
+  assign heading_alpha = heading_color | color_extract: 'alpha'
+  assign preheading_alpha = pretext_color | color_extract: 'alpha'
+  assign subheading_alpha = subheading_color | color_extract: 'alpha'
+  assign mobile_headline_alpha = heading_color_mobile | color_extract: 'alpha'
+  assign mobile_preheading_alpha = pretext_color_mobile | color_extract: 'alpha'
+  assign mobile_subtitle_alpha = subheading_color_mobile | color_extract: 'alpha'
+
+  # Used for iframe "cover" sizing
+  assign iframe_cover_width = '177.778%'
+  if aspect_ratio == '4:3'
+    assign iframe_cover_width = '133.333%'
+  endif
+-%}
+
+{% style %}
+  .{{ scope_class }} .video__text-container .hidden { display: none; }
+
+  {%- if overlay_style != 'none' -%}
+    .{{ scope_class }} .overlay {
+      background-image: linear-gradient({{ gradient_rotation }}deg, rgba(255,255,255,0), {{ gradient }});
+      background-color: {{ video_overlay_color }};
+      opacity: {{ background_opacity | divided_by: 100.00 }};
+    }
+  {%- else -%}
+    .{{ scope_class }} .overlay { display: none; }
+  {%- endif -%}
+
+  .{{ scope_class }} .video__title {
+    color: {% if heading_alpha != 0 %}{{ heading_color }}{% else %}{{ settings.heading_color }}{% endif %};
+  }
+  .{{ scope_class }} .video__subtitle {
+    color: {% if subheading_alpha != 0 %}{{ subheading_color }}{% else %}{{ settings.heading_color }}{% endif %};
+  }
+  .{{ scope_class }} .pretext {
+    color: {% if preheading_alpha != 0 %}{{ pretext_color }}{% else %}{{ settings.heading_color }}{% endif %};
+  }
+
+  @media only screen and (min-width: 480px) {
+    .{{ scope_class }} .video__text-wrapper { width: {{ text_width }}%; }
+  }
+
+  @media only screen and (max-width: 480px) {
+    .{{ scope_class }} .video__title {
+      color: {% if mobile_headline_alpha != 0 %}{{ heading_color_mobile }}{% endif %};
+    }
+    .{{ scope_class }} .video__subtitle {
+      color: {% if mobile_subtitle_alpha != 0 %}{{ subheading_color_mobile }}{% endif %};
+    }
+    .{{ scope_class }} .pretext {
+      color: {% if mobile_preheading_alpha != 0 %}{{ pretext_color_mobile }}{% endif %};
+    }
+  }
+
+  {%- if cover_full_height -%}
+    .{{ scope_class }}.video-block--cover,
+    .{{ scope_class }}.video-block--cover .video-wrapper {
+      height: 100%;
+    }
+
+    .{{ scope_class }}.video-block--cover [data-video-element],
+    .{{ scope_class }}.video-block--cover .plyr,
+    .{{ scope_class }}.video-block--cover .plyr__video-wrapper,
+    .{{ scope_class }}.video-block--cover .plyr__video-embed,
+    .{{ scope_class }}.video-block--cover .video-element {
+      height: 100%;
+    }
+
+    .{{ scope_class }}.video-block--cover .plyr__video-embed,
+    .{{ scope_class }}.video-block--cover .video-element {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .{{ scope_class }}.video-block--cover .video-element video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+    }
+
+    .{{ scope_class }}.video-block--cover .plyr__video-embed iframe {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      height: 100%;
+      width: {{ iframe_cover_width }};
+    }
+
+    .{{ scope_class }}.video-block--cover .image-wrapper {
+      height: 100%;
+    }
+    .{{ scope_class }}.video-block--cover .image-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+  {%- endif -%}
+{% endstyle %}
+
+<div
+  class="
+    featured-video
+    {{ scope_class }}
+    {{ block.settings.css_class }}
+    {% if mobile_text_below_video %}mobile-text--below-media{% else %}mobile-text--over-media{% endif %}
+    {% if video_exists %}has-video-added{% endif %}
+    video-controls-enabled--{{ controls_enabled }}
+    {% if cover_full_height %}video-block--cover{% endif %}
+  "
+  data-video-block
+  data-video-block-id="{{ id }}"
+  {{ block.shopify_attributes }}
+>
+  <div
+    class="
+      video-wrapper
+      overlay--{{ overlay_style }}
+      video-present--{{ video_exists }}
+      video-controls--{{ controls_enabled }}
+    "
+  >
+    {% if image != blank %}
+      <div class="image-wrapper" data-image-element>
+        {%
+          render 'image-element',
+          image: image,
+          alt: image.alt,
+          additional_classes: 'placeholder-img',
+          stretch_width: true,
+          focal_point: image.presentation.focal_point
+        %}
+      </div>
+    {% else %}
+      {% unless video_exists %}
+        <div class="image-wrapper" data-image-element>
+          {{ 'lifestyle-1' | placeholder_svg_tag: 'placeholder-svg placeholder-svg--video' }}
+        </div>
+      {% endunless %}
+    {% endif %}
+
+    {% if video_exists %}
+      {% if iframe_video != blank %}
+        <div class="plyr__video-embed video-{{ id }}" data-video-element>
+          {% if iframe_video.type == 'youtube' %}
+            <iframe
+              src="https://www.youtube.com/embed/{{ iframe_video.id }}?origin=https://plyr.io&amp;iv_load_policy=3&amp;modestbranding=1&amp;playsinline=1&amp;showinfo=0&amp;rel=0&amp;enablejsapi=1&amp;autoplay={% if autoplay %}1{% else %}0{% endif %}&amp;mute={% if mute %}1{% else %}0{% endif %}{% if autoloop %}&amp;loop=1&amp;playlist={{ iframe_video.id }}{% endif %}"
+              allowfullscreen
+              allowtransparency
+              allow="autoplay; encrypted-media; picture-in-picture"
+            ></iframe>
+          {% elsif iframe_video.type == 'vimeo' %}
+            <iframe
+              src="https://player.vimeo.com/video/{{ iframe_video.id }}?byline=false&amp;portrait=false&amp;title=false&amp;speed=true&amp;transparent=0&amp;gesture=media&amp;autoplay={% if autoplay %}1{% else %}0{% endif %}&amp;muted={% if mute %}1{% else %}0{% endif %}&amp;loop={% if autoloop %}1{% else %}0{% endif %}"
+              allowfullscreen
+              allowtransparency
+              allow="autoplay; encrypted-media; picture-in-picture"
+            ></iframe>
+          {% endif %}
+        </div>
+      {% elsif html5_video != blank %}
+        <div class="video-element" data-video-element>
+          <video
+            class="video-{{ id }}"
+            {% if autoplay %}autoplay{% endif %}
+            {% if autoloop %}loop{% endif %}
+            {% if mute %}muted{% endif %}
+            playsinline
+            preload="metadata"
+            {% if controls_enabled and autoplay == false %}controls{% endif %}
+          >
+            <source src="{{ html5_video }}" type="video/mp4">
+          </video>
+        </div>
+      {% endif %}
+    {% endif %}
+
+    <div class="video__text-container" data-video-text-container>
+      <div
+        class="
+          video__text
+          is-justify-{{ vertical_text_position }}
+          {% if pretext == blank and title == blank and subtitle == blank and button_label == blank %}hidden{% endif %}
+        "
+      >
+        <div class="video__text-outer-wrapper is-flex is-justify-{{ horizontal_text_position }}">
+          <div
+            class="
+              video__text-wrapper
+              text-align-{{ text_align }}
+              {% if mobile_text_alignment != 'none' %}text-align--mobile-{{ mobile_text_alignment }}{% endif %}
+            "
+          >
+            <div class="overlay"></div>
+
+            {% if pretext != blank %}
+              <p class="pretext subtitle banner__subheading video__subtitle">{{ pretext }}</p>
+            {% endif %}
+
+            {% if title != blank %}
+              <h2 class="title video__title banner__heading has-small-padding-top"><span>{{ title }}</span></h2>
+            {% endif %}
+
+            {% if subtitle != blank %}
+              <p class="subtitle video__subtitle banner__subheading has-small-padding-top">{{ subtitle }}</p>
+            {% endif %}
+
+            {% if button_label != blank %}
+              <button class="button {{ button_style }}" data-play-button>{{ button_label }}</button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="application/json" data-video-block-settings>
+    {
+      "autoplay": {{ autoplay | json }},
+      "autoloop": {{ autoloop | json }},
+      "video_id": {{ iframe_video.id | json }},
+      "video_type": {{ iframe_video.type | json }},
+      "iframe_video": {{ iframe_video | json }},
+      "html5_video": {{ html5_video | json }},
+      "aspect_ratio": {{ aspect_ratio | json }},
+      "poster": {{ image | json }},
+      "button": {{ button_label | json }},
+      "id": {{ id | json }},
+      "mute": {{ mute | json }}
+    }
+  </script>
+
+  <script>
+    (function () {
+      var root = document.querySelector('[data-video-block-id="{{ id }}"]');
+      if (!root) return;
+      if (root.__videoInited) return;
+      root.__videoInited = true;
+
+      function getSettings() {
+        var s = root.querySelector('script[data-video-block-settings]');
+        if (!s) return null;
+        try { return JSON.parse(s.textContent); } catch (e) { return null; }
+      }
+
+      function isLargeScreen() {
+        if (typeof window.isScreenSizeLarge === 'function') return window.isScreenSizeLarge();
+        return window.innerWidth >= 1024;
+      }
+
+      function ready() { return (typeof window.Plyr !== 'undefined'); }
+
+      function init() {
+        if (!ready()) return false;
+
+        var settings = getSettings();
+        if (!settings) return false;
+
+        var videoElement = root.querySelector('[data-video-element]');
+        var playButton = root.querySelector('[data-play-button]');
+        var videoTextContainer = root.querySelector('[data-video-text-container]');
+        var imageElement = root.querySelector('[data-image-element]');
+
+        if (!settings.iframe_video && !settings.html5_video) {
+          if (imageElement) imageElement.style.display = '';
+          return true;
+        }
+
+        var controls = (typeof window.videoControls !== 'undefined')
+          ? window.videoControls
+          : ['play-large','play','progress','current-time','mute','volume','fullscreen'];
+
+        var target = root.querySelector('.video-' + settings.id);
+        if (!target) return true;
+
+        var player = new window.Plyr(target, {
+          controls: controls,
+          loop: { active: !!settings.autoloop },
+          fullscreen: { enabled: true, fallback: true, iosNative: true },
+          storage: { enabled: false }
+        });
+
+        player.muted = !!settings.mute;
+        player.ratio = settings.aspect_ratio || '16:9';
+
+        function show(el) { if (el) el.style.display = ''; }
+        function hide(el) { if (el) el.style.display = 'none'; }
+
+        if (settings.autoplay) {
+          player.muted = true;
+
+          hide(imageElement);
+          hide(videoTextContainer);
+          show(videoElement);
+
+          var p = player.play();
+          if (p && p.catch) p.catch(function(){});
+        } else {
+          if (settings.poster) {
+            hide(videoElement);
+            show(imageElement);
+            show(videoTextContainer);
+          } else {
+            hide(imageElement);
+            show(videoElement);
+            show(videoTextContainer);
+          }
+        }
+
+        if (settings.button && playButton) {
+          playButton.addEventListener('click', function (e) {
+            e.preventDefault();
+            player.play();
+          });
+        } else if (videoTextContainer) {
+          videoTextContainer.addEventListener('click', function () { player.play(); });
+        }
+
+        if (!isLargeScreen() && root.classList.contains('mobile-text--below-media') && imageElement) {
+          imageElement.addEventListener('click', function () { player.play(); });
+        }
+
+        player.on('play', function () {
+          show(videoElement);
+          hide(imageElement);
+          hide(videoTextContainer);
+        });
+
+        return true;
+      }
+
+      if (!init()) {
+        var tries = 0;
+        var timer = setInterval(function () {
+          tries++;
+          if (init() || tries > 80) clearInterval(timer);
+        }, 150);
+      }
+    })();
+  </script>
+</div>
